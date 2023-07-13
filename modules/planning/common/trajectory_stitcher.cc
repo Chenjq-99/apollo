@@ -123,7 +123,7 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
     std::string* replan_reason) {
   if (!FLAGS_enable_trajectory_stitcher) {
     *replan_reason = "stitch is disabled by gflag.";
-    return ComputeReinitStitchingTrajectory(planning_cycle_time, vehicle_state);
+    return ComputeReinitStitchingTrajectory(planning_cycle_time,  vehicle_state);
   }
   if (!prev_trajectory) {
     *replan_reason = "replan for no previous trajectory.";
@@ -135,6 +135,7 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
     return ComputeReinitStitchingTrajectory(planning_cycle_time, vehicle_state);
   }
 
+  // 上一周期规划的轨迹中点的个数
   size_t prev_trajectory_size = prev_trajectory->NumOfPoints();
 
   if (prev_trajectory_size == 0) {
@@ -144,10 +145,10 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
     *replan_reason = "replan for empty previous trajectory.";
     return ComputeReinitStitchingTrajectory(planning_cycle_time, vehicle_state);
   }
-
+    // 车辆在之前轨迹上的相对时间
   const double veh_rel_time =
       current_timestamp - prev_trajectory->header_time();
-
+    // 按时间找到在上一周期轨迹上最近点对应的索引
   size_t time_matched_index =
       prev_trajectory->QueryLowerBoundPoint(veh_rel_time);
 
@@ -173,23 +174,23 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
     *replan_reason = "replan for previous trajectory missed path point";
     return ComputeReinitStitchingTrajectory(planning_cycle_time, vehicle_state);
   }
-
+    // 按位置找到在上一周期轨迹上最近点对应的索引
   size_t position_matched_index = prev_trajectory->QueryNearestPointWithBuffer(
       {vehicle_state.x(), vehicle_state.y()}, 1.0e-6);
-
+    // 计算车辆位置投影到以上一个轨迹为frenet坐标系下的坐标
   auto frenet_sd = ComputePositionProjection(
       vehicle_state.x(), vehicle_state.y(),
       prev_trajectory->TrajectoryPointAt(
           static_cast<uint32_t>(position_matched_index)));
 
-  if (replan_by_offset) {
+  if (replan_by_offset) { //true
     auto lon_diff = time_matched_point.path_point().s() - frenet_sd.first;
     auto lat_diff = frenet_sd.second;
 
     ADEBUG << "Control lateral diff: " << lat_diff
            << ", longitudinal diff: " << lon_diff;
 
-    if (std::fabs(lat_diff) > FLAGS_replan_lateral_distance_threshold) {
+    if (std::fabs(lat_diff) > FLAGS_replan_lateral_distance_threshold) { //0.5m
       const std::string msg = absl::StrCat(
           "the distance between matched point and actual position is too "
           "large. Replan is triggered. lat_diff = ",
@@ -200,7 +201,7 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
                                               vehicle_state);
     }
 
-    if (std::fabs(lon_diff) > FLAGS_replan_longitudinal_distance_threshold) {
+    if (std::fabs(lon_diff) > FLAGS_replan_longitudinal_distance_threshold) { //2.5m
       const std::string msg = absl::StrCat(
           "the distance between matched point and actual position is too "
           "large. Replan is triggered. lon_diff = ",
@@ -214,7 +215,7 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
     ADEBUG << "replan according to certain amount of lat and lon offset is "
               "disabled";
   }
-
+    // 加上本周期规划需要的时间100ms
   double forward_rel_time = veh_rel_time + planning_cycle_time;
 
   size_t forward_time_index =
@@ -224,14 +225,15 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
   ADEBUG << "Time matched index:\t" << time_matched_index;
 
   auto matched_index = std::min(time_matched_index, position_matched_index);
-
+    // 从match_point往前再保留20个点，截取轨迹
   std::vector<TrajectoryPoint> stitching_trajectory(
       prev_trajectory->begin() +
           std::max(0, static_cast<int>(matched_index - preserved_points_num)),
       prev_trajectory->begin() + forward_time_index + 1);
   ADEBUG << "stitching_trajectory size: " << stitching_trajectory.size();
-
+    // 上周期截取的轨迹的最后一个点作为本周期规划的起点（s = 0）
   const double zero_s = stitching_trajectory.back().path_point().s();
+   // 更新截取部分轨迹的s坐标和相对时间
   for (auto& tp : stitching_trajectory) {
     if (!tp.has_path_point()) {
       *replan_reason = "replan for previous trajectory missed path point";
@@ -240,7 +242,7 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
     }
     tp.set_relative_time(tp.relative_time() + prev_trajectory->header_time() -
                          current_timestamp);
-    tp.mutable_path_point()->set_s(tp.path_point().s() - zero_s);
+    tp.mutable_path_point()->set_s(tp.path_point().s() - zero_s); // 负的
   }
   return stitching_trajectory;
 }
@@ -248,6 +250,7 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
 std::pair<double, double> TrajectoryStitcher::ComputePositionProjection(
     const double x, const double y, const TrajectoryPoint& p) {
   Vec2d v(x - p.path_point().x(), y - p.path_point().y());
+    // 切向量
   Vec2d n(std::cos(p.path_point().theta()), std::sin(p.path_point().theta()));
 
   std::pair<double, double> frenet_sd;

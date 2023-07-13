@@ -183,6 +183,7 @@ Status OnLanePlanning::InitFrame(const uint32_t sequence_num,
 
   std::list<ReferenceLine> reference_lines;
   std::list<hdmap::RouteSegments> segments;
+  // get reference_lines
   if (!reference_line_provider_->GetReferenceLines(&reference_lines,
                                                    &segments)) {
     const std::string msg = "Failed to create reference line";
@@ -325,9 +326,12 @@ void OnLanePlanning::RunOnce(const LocalView& local_view,
 
   // planning is triggered by prediction data, but we can still use an estimated
   // cycle time for stitching
+
+  // 规划周期 1s / 10Hz = 100ms
   const double planning_cycle_time =
       1.0 / static_cast<double>(FLAGS_planning_loop_rate);
-
+  
+  // 获取要拼接的上一周期轨迹   
   std::string replan_reason;
   std::vector<TrajectoryPoint> stitching_trajectory =
       TrajectoryStitcher::ComputeStitchingTrajectory(

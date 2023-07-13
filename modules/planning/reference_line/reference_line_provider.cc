@@ -237,14 +237,14 @@ bool ReferenceLineProvider::GetReferenceLines(
     return result;
   }
 
-  if (FLAGS_enable_reference_line_provider_thread) {
+  if (FLAGS_enable_reference_line_provider_thread) { //如果开启了进程，就直接拷贝，默认是true
     std::lock_guard<std::mutex> lock(reference_lines_mutex_);
     if (!reference_lines_.empty()) {
       reference_lines->assign(reference_lines_.begin(), reference_lines_.end());
       segments->assign(route_segments_.begin(), route_segments_.end());
       return true;
     }
-  } else {
+  } else { // 否则重新计算
     double start_time = Clock::NowInSeconds();
     if (CreateReferenceLine(reference_lines, segments)) {
       UpdateReferenceLine(*reference_lines, *segments);
