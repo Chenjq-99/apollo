@@ -561,13 +561,14 @@ bool ReferenceLineProvider::CreateReferenceLine(
   routing::RoutingResponse routing;
   {
     std::lock_guard<std::mutex> lock(routing_mutex_);
-    routing = routing_;
+    routing = routing_; // 把ReferenceLineProvider中的最新routing拿出来
   }
   bool is_new_routing = false;
   {
     // Update routing in pnc_map
+    // ReferenceLineProvider中的最新routing可能是OnLanePlanning中更新过来的，所以可能和pncMap中存的不一样
     std::lock_guard<std::mutex> lock(pnc_map_mutex_);
-    if (pnc_map_->IsNewRouting(routing)) {
+    if (pnc_map_->IsNewRouting(routing)) { // 如果是新的routing,更新PncMap里的routing
       is_new_routing = true;
       if (!pnc_map_->UpdateRoutingResponse(routing)) {
         AERROR << "Failed to update routing in pnc map";
@@ -576,6 +577,11 @@ bool ReferenceLineProvider::CreateReferenceLine(
     }
   }
 
+    /* 在行驶过程中，车辆的位置一直会变动（vehicle_state中包含了这个信息）
+    CreateRouteSegments方法中会调用pnc_map_->GetRouteSegments(vehicle_state, segments)
+    来获取车辆当前位置周边范围的RouteSegment。如果Routing的结果需要变道，则segments将是多个，
+    否则就是一个（直行的情况）
+    */
   if (!CreateRouteSegments(vehicle_state, segments)) {
     AERROR << "Failed to create reference line from routing";
     return false;

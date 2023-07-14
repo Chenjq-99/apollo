@@ -204,9 +204,15 @@ bool PncMap::IsNewRouting(const routing::RoutingResponse &prev,
 }
 
 bool PncMap::UpdateRoutingResponse(const routing::RoutingResponse &routing) {
+    /*
+        主要做了两件事：
+        1. 把routing剥开，拿到最里层的LaneSegment,存一下{road_index, passage_index, lane_index}
+        2. 获取routing的LaneWayPoints，并且给每个LaneWayPoint匹配到他所在的LaneSegment的idx
+    */ 
   range_lane_ids_.clear();
   route_indices_.clear();
   all_lane_ids_.clear();
+  // 逐级遍历routing，把最里层的LaneSegment拿出来存到route_indices_
   for (int road_index = 0; road_index < routing.road_size(); ++road_index) {
     const auto &road_segment = routing.road(road_index);
     for (int passage_index = 0; passage_index < road_segment.passage_size();
@@ -239,6 +245,7 @@ bool PncMap::UpdateRoutingResponse(const routing::RoutingResponse &routing) {
     AERROR << "Invalid routing: no request waypoints.";
     return false;
   }
+  // 给每个LaneWaypoint，分配Lane idx
   int i = 0;
   for (size_t j = 0; j < route_indices_.size(); ++j) {
     while (i < request_waypoints.size() &&

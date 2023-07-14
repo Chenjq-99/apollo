@@ -297,6 +297,8 @@ void OnLanePlanning::RunOnce(const LocalView& local_view,
 
   // Update reference line provider and reset pull over if necessary
   reference_line_provider_->UpdateVehicleState(vehicle_state);
+  // Update reference line provider
+  // 新从routing模块订阅的local_view_.routing和上一次存的不一样，向reference_line_provider_写入新的routing
   if (util::IsDifferentRouting(last_routing_, *local_view_.routing)) {
     last_routing_ = *local_view_.routing;
     ADEBUG << "last_routing_:" << last_routing_.ShortDebugString();
