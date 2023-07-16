@@ -411,6 +411,7 @@ std::vector<int> PncMap::GetNeighborPassages(const routing::RoadSegment &road,
 }
 bool PncMap::GetRouteSegments(const VehicleState &vehicle_state,
                               std::list<RouteSegments> *const route_segments) {
+    // º∆À„«∞ ”æ‡¿Î
   double look_forward_distance =
       LookForwardDistance(vehicle_state.linear_velocity());
   double look_backward_distance = FLAGS_look_backward_distance;
