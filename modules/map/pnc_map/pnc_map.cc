@@ -381,7 +381,7 @@ std::vector<int> PncMap::GetNeighborPassages(const routing::RoadSegment &road,
            << "] before change lane";
     return result;
   }
-  // 根据换道信息，存储当前RouteSegments中的所有Lane旁边车道的id到neighbor_lanes
+  // 根据换道信息，存储当前通道中的所有LaneSegments中的lane旁边车道的id到neighbor_lanes
   std::unordered_set<std::string> neighbor_lanes;
   if (source_passage.change_lane_type() == routing::LEFT) {
     for (const auto &segment : source_segments) {
@@ -398,7 +398,7 @@ std::vector<int> PncMap::GetNeighborPassages(const routing::RoadSegment &road,
       }
     }
   }
-   // 遍历所有通路的所有Lane，如果有在neighbor_lanes中的，就把这个通路加到结果中
+   // 遍历所有通路的所有LaneSegments的lane.id，如果有在neighbor_lanes中的，就把这个通路加到结果中
   for (int i = 0; i < road.passage_size(); ++i) {
     if (i == start_passage) {
       continue;
