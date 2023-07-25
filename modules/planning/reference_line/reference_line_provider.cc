@@ -197,12 +197,13 @@ void ReferenceLineProvider::GenerateThread() {
     }
     std::list<ReferenceLine> reference_lines;
     std::list<hdmap::RouteSegments> segments;
-    if (!CreateReferenceLine(&reference_lines, &segments)) {
+    if (!CreateReferenceLine(&reference_lines, &segments)) { // 创建ReferenceLine
       is_reference_line_updated_ = false;
       AERROR << "Fail to get reference line";
       continue;
     }
-    UpdateReferenceLine(reference_lines, segments);
+    UpdateReferenceLine(reference_lines, segments); // 更新ReferenceLine
+      is_reference_line_updated_ = false;
     const double end_time = Clock::NowInSeconds();
     std::lock_guard<std::mutex> lock(reference_lines_mutex_);
     last_calculation_time_ = end_time - start_time;

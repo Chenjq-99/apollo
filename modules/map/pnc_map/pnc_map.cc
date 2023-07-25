@@ -631,6 +631,7 @@ LaneInfoConstPtr PncMap::GetRoutePredecessor(LaneInfoConstPtr lane) const {
   return hdmap_->GetLaneById(preferred_id);
 }
 
+// 向前向后截取RouteSegments
 bool PncMap::ExtendSegments(const RouteSegments &segments,
                             const common::PointENU &point, double look_backward,
                             double look_forward,
