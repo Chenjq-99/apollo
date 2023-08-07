@@ -83,6 +83,9 @@ LaneSegment PncMap::ToLaneSegment(const routing::LaneSegment &segment) const {
 }
 
 void PncMap::UpdateNextRoutingWaypointIndex(int cur_index) {
+    /*
+    cur_index是车辆投影点所在LaneSegment在route_indices_中的索引
+    */
   if (cur_index < 0) {
     next_routing_waypoint_index_ = 0;
     return;
@@ -96,7 +99,11 @@ void PncMap::UpdateNextRoutingWaypointIndex(int cur_index) {
          next_routing_waypoint_index_ < routing_waypoint_index_.size() &&
          routing_waypoint_index_[next_routing_waypoint_index_].index >
              cur_index) {
-    --next_routing_waypoint_index_;
+        /*
+        倒车，next_routing_waypoint所在的LaneSegment在route_indices_中的索引 > cur_index
+        --next_routing_waypoint_index_，直到两者在同一个LaneSegment上，这个是LaneSegment层面的搜索
+        */
+    --next_routing_waypoint_index_; 
   }
   while (next_routing_waypoint_index_ != 0 &&
          next_routing_waypoint_index_ < routing_waypoint_index_.size() &&
@@ -104,9 +111,15 @@ void PncMap::UpdateNextRoutingWaypointIndex(int cur_index) {
              cur_index &&
          adc_waypoint_.s <
              routing_waypoint_index_[next_routing_waypoint_index_].waypoint.s) {
+        /*
+        --next_routing_waypoint_index_，直到next_routing_waypoint.s < adc_waypoint_.s，这个是WayPoint层面的搜索
+        */
     --next_routing_waypoint_index_;
   }
   // Search forwards
+  /*
+    向前搜索类似
+  */
   while (next_routing_waypoint_index_ < routing_waypoint_index_.size() &&
          routing_waypoint_index_[next_routing_waypoint_index_].index <
              cur_index) {
@@ -146,6 +159,15 @@ void PncMap::UpdateRoutingRange(int adc_index) {
 }
 
 bool PncMap::UpdateVehicleState(const VehicleState &vehicle_state) {
+    /*
+    这里的无人车状态不是无人车自身坐标，速度等信息，
+    而是在上述更新路由信息过程中得到的route_indices_中，无人车在哪个LaneSegment中，距离无人车最近的下一个查询点waypoint的信息。
+    */
+   /*
+   总体任务：
+   找到当前车辆在对应车道上的投影点adc_waypoint_，车辆投影点所在LaneSegment在route_indices_中的索引adc_route_index_，
+   下一个最近查询点在routing_waypoint_index_中的索引next_routing_waypoint_index_
+   */
   if (!ValidateRouting(routing_)) {
     AERROR << "The routing is invalid when updating vehicle state.";
     return false;
@@ -161,12 +183,14 @@ bool PncMap::UpdateVehicleState(const VehicleState &vehicle_state) {
   }
 
   adc_state_ = vehicle_state;
+  // 根据车辆状态找到在对应车道上的投影点adc_waypoint_
   if (!GetNearestPointFromRouting(vehicle_state, &adc_waypoint_)) {
     AERROR << "Failed to get waypoint from routing with point: "
            << "(" << vehicle_state.x() << ", " << vehicle_state.y() << ", "
            << vehicle_state.z() << ").";
     return false;
   }
+  // 根据adc_waypoint_得到投影点在route_indices_中的索引adc_route_index_
   int route_index = GetWaypointIndex(adc_waypoint_);
   if (route_index < 0 ||
       route_index >= static_cast<int>(route_indices_.size())) {
@@ -175,6 +199,7 @@ bool PncMap::UpdateVehicleState(const VehicleState &vehicle_state) {
   }
 
   // Track how many routing request waypoints the adc have passed.
+  // 找到下一个waypoint在routing_waypoint_index_数组中的index
   UpdateNextRoutingWaypointIndex(route_index);
   adc_route_index_ = route_index;
   UpdateRoutingRange(adc_route_index_);
@@ -245,7 +270,7 @@ bool PncMap::UpdateRoutingResponse(const routing::RoutingResponse &routing) {
     AERROR << "Invalid routing: no request waypoints.";
     return false;
   }
-  // 给每个LaneWaypoint，分配Lane idx
+  // 给每个routing中的点匹配到它所在的LaneSegment在route_indices_中的索引，一同存到routing_waypoint_index_
   int i = 0;
   for (size_t j = 0; j < route_indices_.size(); ++j) {
     while (i < request_waypoints.size() &&
@@ -355,10 +380,11 @@ bool PncMap::PassageToSegments(routing::Passage passage,
 
 std::vector<int> PncMap::GetNeighborPassages(const routing::RoadSegment &road,
                                              int start_passage) const {
+
   CHECK_GE(start_passage, 0);
   CHECK_LE(start_passage, road.passage_size());
   std::vector<int> result;
-  // 拿到当前所在的通路,
+  // 找到当前所在的road_segment的passage
   const auto &source_passage = road.passage(start_passage);
   result.emplace_back(start_passage);
   if (source_passage.change_lane_type() == routing::FORWARD) {
@@ -367,13 +393,15 @@ std::vector<int> PncMap::GetNeighborPassages(const routing::RoadSegment &road,
   if (source_passage.can_exit()) {  // No need to change lane
     return result;
   }
-  // Passage转RouteSegments
+  // Passage转RouteSegment
   RouteSegments source_segments;
   if (!PassageToSegments(source_passage, &source_segments)) {
     AERROR << "Failed to convert passage to segments";
     return result;
   }
-  // 如果下一个点已经不在当前通路上了，意味着要换通道了，才会继续向周围扩展，否则不会向周围扩展
+  /*如果下一个查询点(routing_waypoint_index_[next_routing_waypoint_index_].waypoint)
+  在当前通道中，不需要变道，直接返回车辆所在的车道
+  */
   if (next_routing_waypoint_index_ < routing_waypoint_index_.size() &&
       source_segments.IsWaypointOnSegment(
           routing_waypoint_index_[next_routing_waypoint_index_].waypoint)) {
@@ -381,7 +409,10 @@ std::vector<int> PncMap::GetNeighborPassages(const routing::RoadSegment &road,
            << "] before change lane";
     return result;
   }
-  // 根据换道信息，存储当前RouteSegments中的所有Lane旁边车道的id到neighbor_lanes
+  /*
+    如果车辆再左转车道或者右转车道，从高精地图hd map中查询当前车道对应左侧或者右侧的所有车道线，
+    然后去和当前RoadSegment.passage()去做对比，找到两者共同包含的车道，就是最终的邻接车道。
+  */
   std::unordered_set<std::string> neighbor_lanes;
   if (source_passage.change_lane_type() == routing::LEFT) {
     for (const auto &segment : source_segments) {
@@ -398,7 +429,6 @@ std::vector<int> PncMap::GetNeighborPassages(const routing::RoadSegment &road,
       }
     }
   }
-   // 遍历所有通路的所有Lane，如果有在neighbor_lanes中的，就把这个通路加到结果中
   for (int i = 0; i < road.passage_size(); ++i) {
     if (i == start_passage) {
       continue;
@@ -428,6 +458,7 @@ bool PncMap::GetRouteSegments(const VehicleState &vehicle_state,
                               const double backward_length,
                               const double forward_length,
                               std::list<RouteSegments> *const route_segments) {
+  // 1.更新车辆状态(更新adc_waypoint_,adc_waypoint_index_,next_routing_waypoint_index_)
   if (!UpdateVehicleState(vehicle_state)) {
     AERROR << "Failed to update vehicle state in pnc_map.";
     return false;
@@ -445,13 +476,13 @@ bool PncMap::GetRouteSegments(const VehicleState &vehicle_state,
   const int passage_index = route_index[1];
   const auto &road = routing_.road(road_index);
   // Raw filter to find all neighboring passages
-  // 获取周围的通路idx(passages) passage和route_segment是一个level的都包含一组lane_segment
+  // 2.计算临近通道 
   auto drive_passages = GetNeighborPassages(road, passage_index);
-  // 遍历自身和周围所有通路
+  // 3.创建车辆当前可行驶区域
   for (const int index : drive_passages) {
     const auto &passage = road.passage(index);
     RouteSegments segments;
-    // Passage转RoutSegments
+    // Passage转RoutSegment
     if (!PassageToSegments(passage, &segments)) {
       ADEBUG << "Failed to convert passage to lane segments.";
       continue;
@@ -462,12 +493,13 @@ bool PncMap::GetRouteSegments(const VehicleState &vehicle_state,
             : PointFactory::ToPointENU(adc_state_);
     common::SLPoint sl;
     LaneWaypoint segment_waypoint;
-    // 将最近点投影到当前RoutSegments
+    // 3.1 将当前车辆的坐标投影到Passage
     if (!segments.GetProjection(nearest_point, &sl, &segment_waypoint)) {
       ADEBUG << "Failed to get projection from point: "
              << nearest_point.ShortDebugString();
       continue;
     }
+    // 3.2 对临近通道是否可驶入进行检查
     if (index != passage_index) {
       if (!segments.CanDriveFrom(adc_waypoint_)) {
         ADEBUG << "You cannot drive from current waypoint to passage: "
@@ -477,9 +509,13 @@ bool PncMap::GetRouteSegments(const VehicleState &vehicle_state,
     }
     route_segments->emplace_back();
     const auto last_waypoint = segments.LastWaypoint();
-    // 把当前RoutSegments以投影点向前向后截取并扩展到结果中
+    // 3.3 生成RouteSegmens
     if (!ExtendSegments(segments, sl.s() - backward_length,
                         sl.s() + forward_length, &route_segments->back())) {
+        /*
+            原本车辆在passage中的投影点累计距离为sl.s(注意这个s是投影点在passage段起点的累计距离，
+            而非整个lane的累计距离)，扩展后前向增加forward_length，后向增加backward_length
+        */
       AERROR << "Failed to extend segments with s=" << sl.s()
              << ", backward: " << backward_length
              << ", forward: " << forward_length;
@@ -506,14 +542,17 @@ bool PncMap::GetRouteSegments(const VehicleState &vehicle_state,
   return !route_segments->empty();
 }
 
+// 根据车辆状态找到在<对应车道>上的投影点adc_waypoint_
 bool PncMap::GetNearestPointFromRouting(const VehicleState &state,
                                         LaneWaypoint *waypoint) const {
   waypoint->lane = nullptr;
   std::vector<LaneInfoConstPtr> lanes;
   const auto point = PointFactory::ToPointENU(state);
   std::vector<LaneInfoConstPtr> valid_lanes;
+  // 把all_lane_ids_中记录的车道id都拿出来，加到valid_lanes
   for (auto lane_id : all_lane_ids_) {
     hdmap::Id id = hdmap::MakeMapId(lane_id);
+    // 根据id查询车道
     auto lane = hdmap_->GetLaneById(id);
     if (nullptr != lane) {
       valid_lanes.emplace_back(lane);
@@ -523,12 +562,13 @@ bool PncMap::GetNearestPointFromRouting(const VehicleState &state,
   // Get nearest_waypoints for current position
   std::vector<LaneWaypoint> valid_way_points;
   for (const auto &lane : valid_lanes) {
+    // 过滤掉不在range_lane_ids_中的车道
     if (range_lane_ids_.count(lane->id().id()) == 0) {
       continue;
     }
     double s = 0.0;
     double l = 0.0;
-    {
+    {  // 将车辆xy投影到车道中得到sl
       if (!lane->GetProjection({point.x(), point.y()}, &s, &l)) {
         continue;
       }
@@ -538,7 +578,7 @@ bool PncMap::GetNearestPointFromRouting(const VehicleState &state,
         continue;
       }
     }
-
+    // 把在每个车道的投影点都加入valid_way_points中
     valid_way_points.emplace_back();
     auto &last = valid_way_points.back();
     last.lane = lane;
@@ -575,6 +615,7 @@ bool PncMap::GetNearestPointFromRouting(const VehicleState &state,
     lane_heading = valid_way_points[i].lane->Heading(valid_way_points[i].s);
     if (std::abs(common::math::AngleDiff(lane_heading, vehicle_heading)) <
         M_PI_2) {
+      // 车道和车辆的heading相差不超过90度 -> right heading
       // Choose the lane with the closest distance to the vehicle and with the
       // right heading.
       if (-1 == right_heading_index || closest_index == i) {
@@ -649,11 +690,16 @@ bool PncMap::ExtendSegments(const RouteSegments &segments,
 bool PncMap::ExtendSegments(const RouteSegments &segments, double start_s,
                             double end_s,
                             RouteSegments *const truncated_segments) const {
+    /*
+        sl.s是投影点相对于passage(first_lane_segment.start_s)的累计距离，
+        而不是相对于整个规划路径road(first_passage.first_lane_segment.start_s)的累计距离，这很重要
+    */
   if (segments.empty()) {
     AERROR << "The input segments is empty";
     return false;
   }
   CHECK_NOTNULL(truncated_segments);
+  // 将完整的RouteSegment属性拷贝到要截取的RouteSegment中
   truncated_segments->SetProperties(segments);
 
   if (start_s >= end_s) {
@@ -663,25 +709,25 @@ bool PncMap::ExtendSegments(const RouteSegments &segments, double start_s,
   std::unordered_set<std::string> unique_lanes;
   static constexpr double kRouteEpsilon = 1e-3;
   // Extend the trajectory towards the start of the trajectory.
-  if (start_s < 0) {
-    const auto &first_segment = *segments.begin();
+  if (start_s < 0) { // 当后向查询起始点小于0，说明需要用到这个laneSegment所在lane的前面的部分
+    const auto &first_segment = *segments.begin(); // 获得passage的第一个LaneSegment的所属lane
     auto lane = first_segment.lane;
     double s = first_segment.start_s;
-    double extend_s = -start_s;
-    std::vector<LaneSegment> extended_lane_segments;
-    while (extend_s > kRouteEpsilon) {
-      if (s <= kRouteEpsilon) {
-        lane = GetRoutePredecessor(lane);
+    double extend_s = -start_s; // extend_s为需要从s前截取的道路段长度，初始化为-start_s
+    std::vector<LaneSegment> extended_lane_segments; 
+    while (extend_s > kRouteEpsilon) { // 每次循环(截取)以后extend_s都会减小，直至到0
+      if (s <= kRouteEpsilon) { // 1. s < 0，自己这条lane不够用了，需要在查询这条lane对应的前置车道，把前置车道整个拿过来
+        lane = GetRoutePredecessor(lane); // 获取当前lane的前置车道
         if (lane == nullptr ||
             unique_lanes.find(lane->id().id()) != unique_lanes.end()) {
           break;
         }
         s = lane->total_length();
-      } else {
+      } else { // 2. 如果s > 0，说明当前的lane还够用，截取道路段
         const double length = std::min(s, extend_s);
         extended_lane_segments.emplace_back(lane, s - length, s);
         extend_s -= length;
-        s -= length;
+        s -= length; // 每次截取完，s减去截取的长度，若s < 0，就会到1.中寻求前置的lane
         unique_lanes.insert(lane->id().id());
       }
     }
@@ -689,6 +735,7 @@ bool PncMap::ExtendSegments(const RouteSegments &segments, double start_s,
                                extended_lane_segments.rbegin(),
                                extended_lane_segments.rend());
   }
+  // 下面部分就是正常的passage中LaneSegment截取，根据start_s和end_s
   bool found_loop = false;
   double router_s = 0;
   for (const auto &lane_segment : segments) {
