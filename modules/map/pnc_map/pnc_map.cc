@@ -509,7 +509,7 @@ bool PncMap::GetRouteSegments(const VehicleState &vehicle_state,
     }
     route_segments->emplace_back();
     const auto last_waypoint = segments.LastWaypoint();
-    // 3.3 生成RouteSegmens
+    // 3.3 生成RouteSegments
     if (!ExtendSegments(segments, sl.s() - backward_length,
                         sl.s() + forward_length, &route_segments->back())) {
         /*
@@ -524,7 +524,7 @@ bool PncMap::GetRouteSegments(const VehicleState &vehicle_state,
     if (route_segments->back().IsWaypointOnSegment(last_waypoint)) {
       route_segments->back().SetRouteEndWaypoint(last_waypoint);
     }
-    // 设置信息
+    // 3.4 设置RouteSegments属性
     route_segments->back().SetCanExit(passage.can_exit());
     route_segments->back().SetNextAction(passage.change_lane_type());
     const std::string route_segment_id = absl::StrCat(road_index, "_", index);
@@ -739,6 +739,18 @@ bool PncMap::ExtendSegments(const RouteSegments &segments, double start_s,
   bool found_loop = false;
   double router_s = 0;
   for (const auto &lane_segment : segments) {
+    /* router_s代表已经累计截取到了的LaneSegment长度，
+       如果当前正在截取第3个LaneSegment，那么router_s就是前两个LaneSegment的长度和
+    */
+    /*
+        找到这个LaneSegment需要截取的起点和终点
+        1. router_s还没累加到start_s
+            1.1 start_s不在当前laneSegment里，此时不满足adjusted_start_s < adjusted_end_s，不截取
+            1.2 start_s在当前laneSegment里， 那么adjusted_start_s = start_s - router_s + lane_segment.start_s
+                开始截取
+        2. router_s累加超过start_s
+            adjusted_start_s = lane_segment.start_s，从laneSegment头开始截取
+    */
     const double adjusted_start_s = std::max(
         start_s - router_s + lane_segment.start_s, lane_segment.start_s);
     const double adjusted_end_s =
@@ -758,6 +770,9 @@ bool PncMap::ExtendSegments(const RouteSegments &segments, double start_s,
         break;
       }
     }
+    /*
+       判断是否截取结束，如果结束了那么可以退出，否则就需要继续截取
+    */
     router_s += (lane_segment.end_s - lane_segment.start_s);
     if (router_s > end_s) {
       break;
@@ -767,9 +782,13 @@ bool PncMap::ExtendSegments(const RouteSegments &segments, double start_s,
     return true;
   }
   // Extend the trajectory towards the end of the trajectory.
+  /*
+    当最后循环最后一次最后一个LaneSegment还是没有结束(router_s < end_s)，
+    那么就需要新增加后置车道继续处理
+  */
   if (router_s < end_s && !truncated_segments->empty()) {
     auto &back = truncated_segments->back();
-    if (back.lane->total_length() > back.end_s) {
+    if (back.lane->total_length() > back.end_s) { // 当前lane足够用
       double origin_end_s = back.end_s;
       back.end_s =
           std::min(back.end_s + end_s - router_s, back.lane->total_length());
@@ -777,7 +796,7 @@ bool PncMap::ExtendSegments(const RouteSegments &segments, double start_s,
     }
   }
   auto last_lane = segments.back().lane;
-  while (router_s < end_s - kRouteEpsilon) {
+  while (router_s < end_s - kRouteEpsilon) { // 还是不够找后置车道线
     last_lane = GetRouteSuccessor(last_lane);
     if (last_lane == nullptr ||
         unique_lanes.find(last_lane->id().id()) != unique_lanes.end()) {
