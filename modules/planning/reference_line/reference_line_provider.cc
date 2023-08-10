@@ -578,11 +578,15 @@ bool ReferenceLineProvider::CreateReferenceLine(
     }
   }
 
-    /* 在行驶过程中，车辆的位置一直会变动（vehicle_state中包含了这个信息）
-    CreateRouteSegments方法中会调用pnc_map_->GetRouteSegments(vehicle_state, segments)
-    来获取车辆当前位置周边范围的RouteSegment。如果Routing的结果需要变道，则segments将是多个，
-    否则就是一个（直行的情况）
+    /* 
+        在行驶过程中，车辆的位置一直会变动（vehicle_state中包含了这个信息）
+        CreateRouteSegments方法中会调用pnc_map_->GetRouteSegments(vehicle_state, segments)
+        来获取车辆当前位置周边范围的RouteSegment。如果Routing的结果需要变道，则segments将是多个，
+        否则就是一个（直行的情况）
     */
+   /*
+        获取车辆前后短期的RouteSegments集合(segments)，如果是直行那么segments中只有一个通道，如果换道会有多个通道
+   */
   if (!CreateRouteSegments(vehicle_state, segments)) {
     AERROR << "Failed to create reference line from routing";
     return false;
@@ -877,6 +881,7 @@ void ReferenceLineProvider::GetAnchorPoints(
 
 bool ReferenceLineProvider::SmoothRouteSegment(const RouteSegments &segments,
                                                ReferenceLine *reference_line) {
+    // 构造一个path，用之前得到的通路初始化
   hdmap::Path path(segments);
   return SmoothReferenceLine(ReferenceLine(path), reference_line);
 }

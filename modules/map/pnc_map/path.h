@@ -355,6 +355,8 @@ class Path {
   std::vector<double> lane_accumulated_s_;
   std::vector<LaneSegment> lane_segments_to_next_point_;
   std::vector<common::math::Vec2d> unit_directions_;
+  // Ò»¸öÎ±µÄLane
+  /* + std::vector<MapPathPoint> path_points_;*/
   double length_ = 0.0;
   std::vector<double> accumulated_s_;
   std::vector<common::math::LineSegment2d> segments_;

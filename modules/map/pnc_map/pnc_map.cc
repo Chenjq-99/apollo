@@ -514,7 +514,7 @@ bool PncMap::GetRouteSegments(const VehicleState &vehicle_state,
                         sl.s() + forward_length, &route_segments->back())) {
         /*
             原本车辆在passage中的投影点累计距离为sl.s(注意这个s是投影点在passage段起点的累计距离，
-            而非整个lane的累计距离)，扩展后前向增加forward_length，后向增加backward_length
+            而非在整个lane的累计距离)，扩展后前向增加forward_length，后向增加backward_length
         */
       AERROR << "Failed to extend segments with s=" << sl.s()
              << ", backward: " << backward_length
@@ -810,6 +810,7 @@ bool PncMap::ExtendSegments(const RouteSegments &segments, double start_s,
   return true;
 }
 
+// 将一个laneSegment离散化成一组MapPathPoint
 void PncMap::AppendLaneToPoints(LaneInfoConstPtr lane, const double start_s,
                                 const double end_s,
                                 std::vector<MapPathPoint> *const points) {
@@ -818,19 +819,19 @@ void PncMap::AppendLaneToPoints(LaneInfoConstPtr lane, const double start_s,
   }
   double accumulate_s = 0.0;
   for (size_t i = 0; i < lane->points().size(); ++i) {
-    if (accumulate_s >= start_s && accumulate_s <= end_s) {
+    if (accumulate_s >= start_s && accumulate_s <= end_s) { // 封装中间点point
       points->emplace_back(lane->points()[i], lane->headings()[i],
                            LaneWaypoint(lane, accumulate_s));
     }
     if (i < lane->segments().size()) {
       const auto &segment = lane->segments()[i];
       const double next_accumulate_s = accumulate_s + segment.length();
-      if (start_s > accumulate_s && start_s < next_accumulate_s) {
+      if (start_s > accumulate_s && start_s < next_accumulate_s) { // 封装段起点waypoint
         points->emplace_back(segment.start() + segment.unit_direction() *
                                                    (start_s - accumulate_s),
                              lane->headings()[i], LaneWaypoint(lane, start_s));
       }
-      if (end_s > accumulate_s && end_s < next_accumulate_s) {
+      if (end_s > accumulate_s && end_s < next_accumulate_s) { // 封装段终点waypoint
         points->emplace_back(
             segment.start() + segment.unit_direction() * (end_s - accumulate_s),
             lane->headings()[i], LaneWaypoint(lane, end_s));

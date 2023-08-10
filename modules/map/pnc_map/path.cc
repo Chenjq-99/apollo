@@ -200,6 +200,9 @@ std::vector<MapPathPoint> MapPathPoint::GetPointsFromSegment(
   return GetPointsFromLane(segment.lane, segment.start_s, segment.end_s);
 }
 
+/*
+    将一个laneSegment离散化成一组MapPathPoint
+*/
 std::vector<MapPathPoint> MapPathPoint::GetPointsFromLane(LaneInfoConstPtr lane,
                                                           const double start_s,
                                                           const double end_s) {
@@ -209,19 +212,19 @@ std::vector<MapPathPoint> MapPathPoint::GetPointsFromLane(LaneInfoConstPtr lane,
   }
   double accumulate_s = 0.0;
   for (size_t i = 0; i < lane->points().size(); ++i) {
-    if (accumulate_s >= start_s && accumulate_s <= end_s) {
+    if (accumulate_s >= start_s && accumulate_s <= end_s) { // 封装中间点point
       points.emplace_back(lane->points()[i], lane->headings()[i],
                           LaneWaypoint(lane, accumulate_s));
     }
     if (i < lane->segments().size()) {
       const auto& segment = lane->segments()[i];
       const double next_accumulate_s = accumulate_s + segment.length();
-      if (start_s > accumulate_s && start_s < next_accumulate_s) {
+      if (start_s > accumulate_s && start_s < next_accumulate_s) { // 封装段起点waypoint
         points.emplace_back(segment.start() + segment.unit_direction() *
                                                   (start_s - accumulate_s),
                             lane->headings()[i], LaneWaypoint(lane, start_s));
       }
-      if (end_s > accumulate_s && end_s < next_accumulate_s) {
+      if (end_s > accumulate_s && end_s < next_accumulate_s) { // 封装段终点waypoint
         points.emplace_back(
             segment.start() + segment.unit_direction() * (end_s - accumulate_s),
             lane->headings()[i], LaneWaypoint(lane, end_s));
@@ -314,11 +317,17 @@ Path::Path(const std::vector<MapPathPoint>& path_points,
 
 Path::Path(const std::vector<LaneSegment>& segments)
     : lane_segments_(segments) {
+    /*
+        遍历通道中的每一个LaneSegment，提取出一组MapPathPoint
+    */
   for (const auto& segment : lane_segments_) {
     const auto points = MapPathPoint::GetPointsFromLane(
         segment.lane, segment.start_s, segment.end_s);
     path_points_.insert(path_points_.end(), points.begin(), points.end());
   }
+  /*
+        去除冗余的点
+  */
   MapPathPoint::RemoveDuplicates(&path_points_);
   CHECK_GE(path_points_.size(), 2U);
   Init();
@@ -356,6 +365,16 @@ void Path::Init() {
   InitOverlaps();
 }
 
+/*
+    把从通道中离散得到的点(MapPathPoint)，两两组成一个LaneSegment2d(其实还是LineSegment2d), 
+    由std::vector<common::math::LineSegment2d> segments_存储
+
+    为什么辛辛苦苦把RoutSegment中的LaneSegment中对应的lane中的点拿出来，又还原回去了？
+    猜：1.把所有点都拿出来做一做调整(去除冗余点)
+        2.这样相当于用拿出来的这部分点，又重新生成了一个伪lane(并不是真的生成，使用vector<common::math::LineSegment2d>)，
+        且起点s是从0开始的，相当于抛弃了原来的lane，便于后续操作
+        3.这些点可能还不属于一个lane， 这么做把点都拿出来了，生成了一个新的统一的伪lane
+*/
 void Path::InitPoints() {
   num_points_ = static_cast<int>(path_points_.size());
   CHECK_GE(num_points_, 2);
@@ -373,6 +392,9 @@ void Path::InitPoints() {
     if (i + 1 >= num_points_) {
       heading = path_points_[i] - path_points_[i - 1];
     } else {
+        /*
+            这里能直接用MapPathPoint构造LineSegment2d，是因为MapPathPoint继承于Vec2d
+        */
       segments_.emplace_back(path_points_[i], path_points_[i + 1]);
       heading = path_points_[i + 1] - path_points_[i];
       // TODO(All): use heading.length when all adjacent lanes are guarantee to
@@ -382,7 +404,7 @@ void Path::InitPoints() {
     heading.Normalize();
     unit_directions_.push_back(heading);
   }
-  length_ = s;
+  length_ = s; // 新的lane(伪)的长度
   num_sample_points_ = static_cast<int>(length_ / kSampleDistance) + 1;
   num_segments_ = num_points_ - 1;
 
@@ -391,6 +413,10 @@ void Path::InitPoints() {
   CHECK_EQ(segments_.size(), static_cast<size_t>(num_segments_));
 }
 
+    /*
+        把从通道中离散得到的点(MapPathPoint)，两两组成一个小LaneSegment，再把属于同一车道的
+        由std::vector<common::math::LineSegment2d> segments_存储
+    */
 void Path::InitLaneSegments() {
   if (lane_segments_.empty()) {
     for (int i = 0; i + 1 < num_points_; ++i) {
