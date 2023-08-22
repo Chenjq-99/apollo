@@ -414,8 +414,8 @@ void Path::InitPoints() {
 }
 
     /*
-        把从通道中离散得到的点(MapPathPoint)，两两组成一个小LaneSegment，再把属于同一车道的
-        由std::vector<common::math::LineSegment2d> segments_存储
+        把两两组成一个小LaneSegment2d中属于同一车道的拼接成LaneSegment
+        由std::vector<LaneSegment> lane_segments_存储
     */
 void Path::InitLaneSegments() {
   if (lane_segments_.empty()) {
@@ -501,17 +501,22 @@ void Path::InitWidth() {
   CHECK_EQ(road_right_width_.size(), num_sample_points);
 }
 
+/*
+将得到的一组LineSegment2d(std::vector<common::math::LineSegment2d> segments_),也就是伪lane
+继续采样，离散化，每隔(kSampleDistance == 0.25m)采样一个点
+*/
 void Path::InitPointIndex() {
   last_point_index_.clear();
   last_point_index_.reserve(num_sample_points_);
   double s = 0.0;
   int last_index = 0;
   for (int i = 0; i < num_sample_points_; ++i) {
+    // 向后遍历，得到采样点i(对应累积距离为s)的下界MapPathPoint的索引last_index
     while (last_index + 1 < num_points_ &&
            accumulated_s_[last_index + 1] <= s) {
       ++last_index;
     }
-    last_point_index_.push_back(last_index);
+    last_point_index_.push_back(last_index); // 下一个采样点的累积距离，加上0.25
     s += kSampleDistance;
   }
   CHECK_EQ(last_point_index_.size(), static_cast<size_t>(num_sample_points_));
@@ -603,6 +608,9 @@ void Path::InitOverlaps() {
                  &parking_space_overlaps_);
 }
 
+/*
+插值平滑
+*/
 MapPathPoint Path::GetSmoothPoint(const InterpolatedIndex& index) const {
   CHECK_GE(index.id, 0);
   CHECK_LT(index.id, num_points_);
@@ -663,7 +671,9 @@ InterpolatedIndex Path::GetIndexFromS(double s) const {
     return {num_points_ - 1, 0.0};
   }
   const int next_sample_id = sample_id + 1;
+  // 下介点MapPoint的id
   int low = last_point_index_[sample_id];
+  // 上介点MapPoint的id
   int high = (next_sample_id < num_sample_points_
                   ? std::min(num_points_, last_point_index_[next_sample_id] + 1)
                   : num_points_);
@@ -675,6 +685,7 @@ InterpolatedIndex Path::GetIndexFromS(double s) const {
       high = mid;
     }
   }
+  // 返回下介点的id，以及距离下节点的距离
   return {low, s - accumulated_s_[low]};
 }
 
