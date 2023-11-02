@@ -785,19 +785,22 @@ bool ReferenceLineProvider::IsReferenceLineSmoothValid(
 AnchorPoint ReferenceLineProvider::GetAnchorPoint(
     const ReferenceLine &reference_line, double s) const {
   AnchorPoint anchor;
+//   纵向裕度，离散点平滑longitudinal_boundary_bound = 2.0
   anchor.longitudinal_bound = smoother_config_.longitudinal_boundary_bound();
+//   获取参考点（根据s找到上界点和下界点，之后线性插值）
   auto ref_point = reference_line.GetReferencePoint(s);
   if (ref_point.lane_waypoints().empty()) {
     anchor.path_point = ref_point.ToPathPoint(s);
     anchor.lateral_bound = smoother_config_.max_lateral_boundary_bound();
     return anchor;
   }
-
+// 获得车辆宽度
   const double adc_width =
       VehicleConfigHelper::GetConfig().vehicle_param().width();
   const Vec2d left_vec =
       Vec2d::CreateUnitVec2d(ref_point.heading() + M_PI / 2.0);
   auto waypoint = ref_point.lane_waypoints().front();
+//   计算车道距左边界距离left_width和距右边界距离right_width
   double left_width = 0.0;
   double right_width = 0.0;
   waypoint.lane->GetWidth(waypoint.s, &left_width, &right_width);
@@ -805,6 +808,7 @@ AnchorPoint ReferenceLineProvider::GetAnchorPoint(
   double effective_width = 0.0;
 
   // shrink width by vehicle width, curb
+  // 当前位置，车道总宽度
   double safe_lane_width = left_width + right_width;
   safe_lane_width -= adc_width;
   bool is_lane_width_safe = true;
@@ -848,9 +852,10 @@ AnchorPoint ReferenceLineProvider::GetAnchorPoint(
   if (is_lane_width_safe) {
     effective_width = 0.5 * safe_lane_width;
   }
-
+// 中心点横向调整，主要是因为curb
   ref_point += left_vec * center_shift;
   anchor.path_point = ref_point.ToPathPoint(s);
+//   设置横向裕度
   anchor.lateral_bound = common::math::Clamp(
       effective_width, smoother_config_.min_lateral_boundary_bound(),
       smoother_config_.max_lateral_boundary_bound());
@@ -861,16 +866,21 @@ void ReferenceLineProvider::GetAnchorPoints(
     const ReferenceLine &reference_line,
     std::vector<AnchorPoint> *anchor_points) const {
   CHECK_NOTNULL(anchor_points);
+  // 采样间隔，默认离散点平滑max_constraint_interval=0.25，即路径累积距离每0.25m采样一个点。
   const double interval = smoother_config_.max_constraint_interval();
+  // 路径采样点数量计算
   int num_of_anchors =
       std::max(2, static_cast<int>(reference_line.Length() / interval + 0.5));
   std::vector<double> anchor_s;
+  // uniform_slice函数就是对[0.0, reference_line.Length()]区间等间隔采样，每两个点之间距离为(length_-0.0)/(num_of_anchors - 1)
   common::util::uniform_slice(0.0, reference_line.Length(), num_of_anchors - 1,
                               &anchor_s);
+  // 按s获取AnchorPoint
   for (const double s : anchor_s) {
     AnchorPoint anchor = GetAnchorPoint(reference_line, s);
     anchor_points->emplace_back(anchor);
   }
+  // 首尾两个点设置为强约束
   anchor_points->front().longitudinal_bound = 1e-6;
   anchor_points->front().lateral_bound = 1e-6;
   anchor_points->front().enforced = true;

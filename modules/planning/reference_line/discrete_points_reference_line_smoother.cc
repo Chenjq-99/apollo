@@ -56,6 +56,7 @@ bool DiscretePointsReferenceLineSmoother::Smooth(
 
   const auto& smoothing_method = config_.discrete_points().smoothing_method();
   std::vector<std::pair<double, double>> smoothed_point2d;
+  // 两种评价平滑的方式
   switch (smoothing_method) {
     case DiscretePointsSmootherConfig::COS_THETA_SMOOTHING:
       status = CosThetaSmooth(raw_point2d, anchorpoints_lateralbound,
@@ -136,6 +137,19 @@ bool DiscretePointsReferenceLineSmoother::FemPosSmooth(
     const std::vector<std::pair<double, double>>& raw_point2d,
     const std::vector<double>& bounds,
     std::vector<std::pair<double, double>>* ptr_smoothed_point2d) {
+  /*
+    fem_pos_deviation_smoothing {
+      weight_fem_pos_deviation: 1e10
+      weight_ref_deviation: 1.0
+      weight_path_length: 1.0
+      apply_curvature_constraint: false
+      max_iter: 500
+      time_limit: 0.0
+      verbose: false
+      scaled_termination: true
+      warm_start: true
+    }
+  */
   const auto& fem_pos_config =
       config_.discrete_points().fem_pos_deviation_smoothing();
 
@@ -143,12 +157,13 @@ bool DiscretePointsReferenceLineSmoother::FemPosSmooth(
 
   // box contraints on pos are used in fem pos smoother, thus shrink the
   // bounds by 1.0 / sqrt(2.0)
+  // 收紧约束裕度
   std::vector<double> box_bounds = bounds;
   const double box_ratio = 1.0 / std::sqrt(2.0);
   for (auto& bound : box_bounds) {
     bound *= box_ratio;
   }
-
+  // 调用OSQP求解最优xy
   std::vector<double> opt_x;
   std::vector<double> opt_y;
   bool status = smoother.Solve(raw_point2d, box_bounds, &opt_x, &opt_y);
@@ -214,11 +229,12 @@ bool DiscretePointsReferenceLineSmoother::GenerateRefPointProfile(
   std::vector<double> kappas;
   std::vector<double> dkappas;
   std::vector<double> accumulated_s;
+  // 平滑后的一组点，增加heading kappa属性（重要）
   if (!DiscretePointsMath::ComputePathProfile(
           xy_points, &headings, &accumulated_s, &kappas, &dkappas)) {
     return false;
   }
-
+  // chenjq20231102
   // Load into ReferencePoints
   size_t points_size = xy_points.size();
   for (size_t i = 0; i < points_size; ++i) {

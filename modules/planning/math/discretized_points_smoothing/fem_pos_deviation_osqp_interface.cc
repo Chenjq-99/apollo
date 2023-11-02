@@ -53,13 +53,13 @@ bool FemPosDeviationOsqpInterface::Solve() {
   num_of_points_ = static_cast<int>(ref_points_.size());
   num_of_variables_ = num_of_points_ * 2;
   num_of_constraints_ = num_of_variables_;
-
+  // 计算权重矩阵
   // Calculate kernel
   std::vector<c_float> P_data;
   std::vector<c_int> P_indices;
   std::vector<c_int> P_indptr;
   CalculateKernel(&P_data, &P_indices, &P_indptr);
-
+  // 约束的仿射矩阵
   // Calculate affine constraints
   std::vector<c_float> A_data;
   std::vector<c_int> A_indices;
@@ -68,7 +68,7 @@ bool FemPosDeviationOsqpInterface::Solve() {
   std::vector<c_float> upper_bounds;
   CalculateAffineConstraint(&A_data, &A_indices, &A_indptr, &lower_bounds,
                             &upper_bounds);
-
+  // 1/2XPX + qX中的q
   // Calculate offset
   std::vector<c_float> q;
   CalculateOffset(&q);
@@ -217,6 +217,7 @@ void FemPosDeviationOsqpInterface::CalculateKernel(
       // Rescale by 2.0 as the quadratic term in osqp default qp problem setup
       // is set as (1/2) * x' * P * x
       P_data->push_back(row_data_pair.second * 2.0);
+      // 对应的行号
       P_indices->push_back(row_data_pair.first);
       ++ind_p;
     }

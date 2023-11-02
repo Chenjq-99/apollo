@@ -293,6 +293,7 @@ std::vector<ReferencePoint> ReferenceLine::GetReferencePoints(
 }
 
 ReferencePoint ReferenceLine::GetReferencePoint(const double s) const {
+  // 拿出地图中的Path的accumulated_数组
   const auto& accumulated_s = map_path_.accumulated_s();
   if (s < accumulated_s.front() - 1e-2) {
     AWARN << "The requested s: " << s << " < 0.";
@@ -303,10 +304,11 @@ ReferencePoint ReferenceLine::GetReferencePoint(const double s) const {
           << " > reference line length: " << accumulated_s.back();
     return reference_points_.back();
   }
-
+  // 拿到s对应下界点的id，以及距离下界点的距离
   auto interpolate_index = map_path_.GetIndexFromS(s);
 
   size_t index = interpolate_index.id;
+  // 上界点id
   size_t next_index = index + 1;
   if (next_index >= reference_points_.size()) {
     next_index = reference_points_.size() - 1;
@@ -317,6 +319,7 @@ ReferencePoint ReferenceLine::GetReferencePoint(const double s) const {
 
   const double s0 = accumulated_s[index];
   const double s1 = accumulated_s[next_index];
+  // 根据两个点进行线性插值
   return InterpolateWithMatchedIndex(p0, s0, p1, s1, interpolate_index);
 }
 

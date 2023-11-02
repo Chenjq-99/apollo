@@ -27,6 +27,7 @@
 namespace apollo {
 namespace planning {
 
+// 重要，根据一组离散点，计算heading kappa等等
 bool DiscretePointsMath::ComputePathProfile(
     const std::vector<std::pair<double, double>>& xy_points,
     std::vector<double>* headings, std::vector<double>* accumulated_s,
@@ -67,12 +68,12 @@ bool DiscretePointsMath::ComputePathProfile(
     dxs.push_back(x_delta);
     dys.push_back(y_delta);
   }
-
+  // 计算heading
   // Heading calculation
   for (std::size_t i = 0; i < points_size; ++i) {
     headings->push_back(std::atan2(dys[i], dxs[i]));
   }
-
+  // 计算accumulate_s
   // Get linear interpolated s for dkappa calculation
   double distance = 0.0;
   accumulated_s->push_back(distance);

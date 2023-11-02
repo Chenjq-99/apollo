@@ -373,7 +373,7 @@ void Path::Init() {
     猜：1.把所有点都拿出来做一做调整(去除冗余点)
         2.这样相当于用拿出来的这部分点，又重新生成了一个伪lane(并不是真的生成，使用vector<common::math::LineSegment2d>)，
         且起点s是从0开始的，相当于抛弃了原来的lane，便于后续操作
-        3.这些点可能还不属于一个lane， 这么做把点都拿出来了，生成了一个新的统一的伪lane
+        3.这些点可能还不属于一个lane， 这么做把点都拿出来了，生成了一个新的统一的伪lane,并重新设置了起点
 */
 void Path::InitPoints() {
   num_points_ = static_cast<int>(path_points_.size());
@@ -528,13 +528,16 @@ void Path::GetAllOverlaps(GetOverlapFromLaneFunc GetOverlaps_from_lane,
     return;
   }
   overlaps->clear();
+//   计算所有覆盖区域，保存到overlaps_by_id
   std::unordered_map<std::string, std::vector<std::pair<double, double>>>
       overlaps_by_id;
   double s = 0.0;
+//   循环1
   for (const auto& lane_segment : lane_segments_) {
     if (lane_segment.lane == nullptr) {
       continue;
     }
+    // GetOverlaps_from_lane是之前的std::bind(&LaneInfo::cross_lanes, _1)，传入的是LaneInfo类型的lane对象的this指针
     for (const auto& overlap : GetOverlaps_from_lane(*(lane_segment.lane))) {
       const auto& overlap_info =
           overlap->GetObjectOverlapInfo(lane_segment.lane->id());
