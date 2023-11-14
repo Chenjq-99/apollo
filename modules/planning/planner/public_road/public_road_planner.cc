@@ -29,7 +29,7 @@ Status PublicRoadPlanner::Init(const PlanningConfig& config) {
   scenario_manager_.Init(config);
   return Status::OK();
 }
-
+// chenjq20231114(2)
 Status PublicRoadPlanner::Plan(const TrajectoryPoint& planning_start_point,
                                Frame* frame,
                                ADCTrajectory* ptr_computed_trajectory) {
