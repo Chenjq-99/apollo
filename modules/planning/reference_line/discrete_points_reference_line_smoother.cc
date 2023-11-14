@@ -63,6 +63,7 @@ bool DiscretePointsReferenceLineSmoother::Smooth(
                               &smoothed_point2d);
       break;
     case DiscretePointsSmootherConfig::FEM_POS_DEVIATION_SMOOTHING:
+    // 获得平滑后的XY点
       status = FemPosSmooth(raw_point2d, anchorpoints_lateralbound,
                             &smoothed_point2d);
       break;
@@ -79,6 +80,7 @@ bool DiscretePointsReferenceLineSmoother::Smooth(
   DeNormalizePoints(&smoothed_point2d);
 
   std::vector<ReferencePoint> ref_points;
+  // 将平滑后的XY点扩展为ReferencePoint
   GenerateRefPointProfile(raw_reference_line, smoothed_point2d, &ref_points);
 
   ReferencePoint::RemoveDuplicates(&ref_points);
@@ -87,7 +89,7 @@ bool DiscretePointsReferenceLineSmoother::Smooth(
     AERROR << "Fail to generate smoothed reference line.";
     return false;
   }
-
+  // 使用扩展后的ReferencePoint数组构造一条光滑的参考线
   *smoothed_reference_line = ReferenceLine(ref_points);
   return true;
 }
@@ -238,6 +240,7 @@ bool DiscretePointsReferenceLineSmoother::GenerateRefPointProfile(
   // Load into ReferencePoints
   size_t points_size = xy_points.size();
   for (size_t i = 0; i < points_size; ++i) {
+    // 平滑后的参考线上的点在原参考系下的SL坐标
     common::SLPoint ref_sl_point;
     if (!raw_reference_line.XYToSL({xy_points[i].first, xy_points[i].second},
                                    &ref_sl_point)) {

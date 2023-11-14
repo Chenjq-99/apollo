@@ -201,7 +201,7 @@ std::vector<MapPathPoint> MapPathPoint::GetPointsFromSegment(
 }
 
 /*
-    ½«Ò»¸ölaneSegmentÀëÉ¢»¯³ÉÒ»×éMapPathPoint
+    ï¿½ï¿½Ò»ï¿½ï¿½laneSegmentï¿½ï¿½É¢ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½MapPathPoint
 */
 std::vector<MapPathPoint> MapPathPoint::GetPointsFromLane(LaneInfoConstPtr lane,
                                                           const double start_s,
@@ -212,19 +212,19 @@ std::vector<MapPathPoint> MapPathPoint::GetPointsFromLane(LaneInfoConstPtr lane,
   }
   double accumulate_s = 0.0;
   for (size_t i = 0; i < lane->points().size(); ++i) {
-    if (accumulate_s >= start_s && accumulate_s <= end_s) { // ·â×°ÖĞ¼äµãpoint
+    if (accumulate_s >= start_s && accumulate_s <= end_s) { // ï¿½ï¿½×°ï¿½Ğ¼ï¿½ï¿½point
       points.emplace_back(lane->points()[i], lane->headings()[i],
                           LaneWaypoint(lane, accumulate_s));
     }
     if (i < lane->segments().size()) {
       const auto& segment = lane->segments()[i];
       const double next_accumulate_s = accumulate_s + segment.length();
-      if (start_s > accumulate_s && start_s < next_accumulate_s) { // ·â×°¶ÎÆğµãwaypoint
+      if (start_s > accumulate_s && start_s < next_accumulate_s) { // ï¿½ï¿½×°ï¿½ï¿½ï¿½ï¿½ï¿½waypoint
         points.emplace_back(segment.start() + segment.unit_direction() *
                                                   (start_s - accumulate_s),
                             lane->headings()[i], LaneWaypoint(lane, start_s));
       }
-      if (end_s > accumulate_s && end_s < next_accumulate_s) { // ·â×°¶ÎÖÕµãwaypoint
+      if (end_s > accumulate_s && end_s < next_accumulate_s) { // ï¿½ï¿½×°ï¿½ï¿½ï¿½Õµï¿½waypoint
         points.emplace_back(
             segment.start() + segment.unit_direction() * (end_s - accumulate_s),
             lane->headings()[i], LaneWaypoint(lane, end_s));
@@ -318,7 +318,7 @@ Path::Path(const std::vector<MapPathPoint>& path_points,
 Path::Path(const std::vector<LaneSegment>& segments)
     : lane_segments_(segments) {
     /*
-        ±éÀúÍ¨µÀÖĞµÄÃ¿Ò»¸öLaneSegment£¬ÌáÈ¡³öÒ»×éMapPathPoint
+        ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½ï¿½Ğµï¿½Ã¿Ò»ï¿½ï¿½LaneSegmentï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½Ò»ï¿½ï¿½MapPathPoint
     */
   for (const auto& segment : lane_segments_) {
     const auto points = MapPathPoint::GetPointsFromLane(
@@ -326,7 +326,7 @@ Path::Path(const std::vector<LaneSegment>& segments)
     path_points_.insert(path_points_.end(), points.begin(), points.end());
   }
   /*
-        È¥³ıÈßÓàµÄµã
+        È¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½
   */
   MapPathPoint::RemoveDuplicates(&path_points_);
   CHECK_GE(path_points_.size(), 2U);
@@ -366,14 +366,14 @@ void Path::Init() {
 }
 
 /*
-    °Ñ´ÓÍ¨µÀÖĞÀëÉ¢µÃµ½µÄµã(MapPathPoint)£¬Á½Á½×é³ÉÒ»¸öLaneSegment2d(ÆäÊµ»¹ÊÇLineSegment2d), 
-    ÓÉstd::vector<common::math::LineSegment2d> segments_´æ´¢
+    ï¿½Ñ´ï¿½Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É¢ï¿½Ãµï¿½ï¿½Äµï¿½(MapPathPoint)ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½LaneSegment2d(ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½LineSegment2d), 
+    ï¿½ï¿½std::vector<common::math::LineSegment2d> segments_ï¿½æ´¢
 
-    ÎªÊ²Ã´ĞÁĞÁ¿à¿à°ÑRoutSegmentÖĞµÄLaneSegmentÖĞ¶ÔÓ¦µÄlaneÖĞµÄµãÄÃ³öÀ´£¬ÓÖ»¹Ô­»ØÈ¥ÁË£¿
-    ²Â£º1.°ÑËùÓĞµã¶¼ÄÃ³öÀ´×öÒ»×öµ÷Õû(È¥³ıÈßÓàµã)
-        2.ÕâÑùÏàµ±ÓÚÓÃÄÃ³öÀ´µÄÕâ²¿·Öµã£¬ÓÖÖØĞÂÉú³ÉÁËÒ»¸öÎ±lane(²¢²»ÊÇÕæµÄÉú³É£¬Ê¹ÓÃvector<common::math::LineSegment2d>)£¬
-        ÇÒÆğµãsÊÇ´Ó0¿ªÊ¼µÄ£¬Ïàµ±ÓÚÅ×ÆúÁËÔ­À´µÄlane£¬±ãÓÚºóĞø²Ù×÷
-        3.ÕâĞ©µã¿ÉÄÜ»¹²»ÊôÓÚÒ»¸ölane£¬ ÕâÃ´×ö°Ñµã¶¼ÄÃ³öÀ´ÁË£¬Éú³ÉÁËÒ»¸öĞÂµÄÍ³Ò»µÄÎ±lane,²¢ÖØĞÂÉèÖÃÁËÆğµã
+    ÎªÊ²Ã´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½RoutSegmentï¿½Ğµï¿½LaneSegmentï¿½Ğ¶ï¿½Ó¦ï¿½ï¿½laneï¿½ĞµÄµï¿½ï¿½Ã³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö»ï¿½Ô­ï¿½ï¿½È¥ï¿½Ë£ï¿½
+    ï¿½Â£ï¿½1.ï¿½ï¿½ï¿½ï¿½ï¿½Ğµã¶¼ï¿½Ã³ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(È¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
+        2.ï¿½ï¿½ï¿½ï¿½ï¿½àµ±ï¿½ï¿½ï¿½ï¿½ï¿½Ã³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½â²¿ï¿½Öµã£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½Î±lane(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É£ï¿½Ê¹ï¿½ï¿½vector<common::math::LineSegment2d>)ï¿½ï¿½
+        ï¿½ï¿½ï¿½ï¿½ï¿½sï¿½Ç´ï¿½0ï¿½ï¿½Ê¼ï¿½Ä£ï¿½ï¿½àµ±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô­ï¿½ï¿½ï¿½ï¿½laneï¿½ï¿½ï¿½ï¿½ï¿½Úºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+        3.ï¿½ï¿½Ğ©ï¿½ï¿½ï¿½ï¿½Ü»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½laneï¿½ï¿½ ï¿½ï¿½Ã´ï¿½ï¿½ï¿½Ñµã¶¼ï¿½Ã³ï¿½ï¿½ï¿½ï¿½Ë£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Âµï¿½Í³Ò»ï¿½ï¿½Î±lane,ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 */
 void Path::InitPoints() {
   num_points_ = static_cast<int>(path_points_.size());
@@ -393,7 +393,7 @@ void Path::InitPoints() {
       heading = path_points_[i] - path_points_[i - 1];
     } else {
         /*
-            ÕâÀïÄÜÖ±½ÓÓÃMapPathPoint¹¹ÔìLineSegment2d£¬ÊÇÒòÎªMapPathPoint¼Ì³ĞÓÚVec2d
+            ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö±ï¿½ï¿½ï¿½ï¿½MapPathPointï¿½ï¿½ï¿½ï¿½LineSegment2dï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÎªMapPathPointï¿½Ì³ï¿½ï¿½ï¿½Vec2d
         */
       segments_.emplace_back(path_points_[i], path_points_[i + 1]);
       heading = path_points_[i + 1] - path_points_[i];
@@ -404,7 +404,7 @@ void Path::InitPoints() {
     heading.Normalize();
     unit_directions_.push_back(heading);
   }
-  length_ = s; // ĞÂµÄlane(Î±)µÄ³¤¶È
+  length_ = s; // ï¿½Âµï¿½lane(Î±)ï¿½Ä³ï¿½ï¿½ï¿½
   num_sample_points_ = static_cast<int>(length_ / kSampleDistance) + 1;
   num_segments_ = num_points_ - 1;
 
@@ -414,8 +414,8 @@ void Path::InitPoints() {
 }
 
     /*
-        °ÑÁ½Á½×é³ÉÒ»¸öĞ¡LaneSegment2dÖĞÊôÓÚÍ¬Ò»³µµÀµÄÆ´½Ó³ÉLaneSegment
-        ÓÉstd::vector<LaneSegment> lane_segments_´æ´¢
+        ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½Ğ¡LaneSegment2dï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¬Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ´ï¿½Ó³ï¿½LaneSegment
+        ï¿½ï¿½std::vector<LaneSegment> lane_segments_ï¿½æ´¢
     */
 void Path::InitLaneSegments() {
   if (lane_segments_.empty()) {
@@ -502,8 +502,8 @@ void Path::InitWidth() {
 }
 
 /*
-½«µÃµ½µÄÒ»×éLineSegment2d(std::vector<common::math::LineSegment2d> segments_),Ò²¾ÍÊÇÎ±lane
-¼ÌĞø²ÉÑù£¬ÀëÉ¢»¯£¬Ã¿¸ô(kSampleDistance == 0.25m)²ÉÑùÒ»¸öµã
+ï¿½ï¿½ï¿½Ãµï¿½ï¿½ï¿½Ò»ï¿½ï¿½LineSegment2d(std::vector<common::math::LineSegment2d> segments_),Ò²ï¿½ï¿½ï¿½ï¿½Î±lane
+ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É¢ï¿½ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½(kSampleDistance == 0.25m)ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½
 */
 void Path::InitPointIndex() {
   last_point_index_.clear();
@@ -511,12 +511,12 @@ void Path::InitPointIndex() {
   double s = 0.0;
   int last_index = 0;
   for (int i = 0; i < num_sample_points_; ++i) {
-    // Ïòºó±éÀú£¬µÃµ½²ÉÑùµãi(¶ÔÓ¦ÀÛ»ı¾àÀëÎªs)µÄÏÂ½çMapPathPointµÄË÷Òılast_index
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ãµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½i(ï¿½ï¿½Ó¦ï¿½Û»ï¿½ï¿½ï¿½ï¿½ï¿½Îªs)ï¿½ï¿½ï¿½Â½ï¿½MapPathPointï¿½ï¿½ï¿½ï¿½ï¿½ï¿½last_index
     while (last_index + 1 < num_points_ &&
            accumulated_s_[last_index + 1] <= s) {
       ++last_index;
     }
-    last_point_index_.push_back(last_index); // ÏÂÒ»¸ö²ÉÑùµãµÄÀÛ»ı¾àÀë£¬¼ÓÉÏ0.25
+    last_point_index_.push_back(last_index); // ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Û»ï¿½ï¿½ï¿½ï¿½ë£¬ï¿½ï¿½ï¿½ï¿½0.25
     s += kSampleDistance;
   }
   CHECK_EQ(last_point_index_.size(), static_cast<size_t>(num_sample_points_));
@@ -528,16 +528,16 @@ void Path::GetAllOverlaps(GetOverlapFromLaneFunc GetOverlaps_from_lane,
     return;
   }
   overlaps->clear();
-//   ¼ÆËãËùÓĞ¸²¸ÇÇøÓò£¬±£´æµ½overlaps_by_id
+//   ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ò£¬±ï¿½ï¿½æµ½overlaps_by_id
   std::unordered_map<std::string, std::vector<std::pair<double, double>>>
       overlaps_by_id;
   double s = 0.0;
-//   Ñ­»·1
+//   Ñ­ï¿½ï¿½1
   for (const auto& lane_segment : lane_segments_) {
     if (lane_segment.lane == nullptr) {
       continue;
     }
-    // GetOverlaps_from_laneÊÇÖ®Ç°µÄstd::bind(&LaneInfo::cross_lanes, _1)£¬´«ÈëµÄÊÇLaneInfoÀàĞÍµÄlane¶ÔÏóµÄthisÖ¸Õë
+    // GetOverlaps_from_laneï¿½ï¿½Ö®Ç°ï¿½ï¿½std::bind(&LaneInfo::cross_lanes, _1)ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½LaneInfoï¿½ï¿½ï¿½Íµï¿½laneï¿½ï¿½ï¿½ï¿½ï¿½thisÖ¸ï¿½ï¿½
     for (const auto& overlap : GetOverlaps_from_lane(*(lane_segment.lane))) {
       const auto& overlap_info =
           overlap->GetObjectOverlapInfo(lane_segment.lane->id());
@@ -612,7 +612,7 @@ void Path::InitOverlaps() {
 }
 
 /*
-²åÖµÆ½»¬
+ï¿½ï¿½ÖµÆ½ï¿½ï¿½
 */
 MapPathPoint Path::GetSmoothPoint(const InterpolatedIndex& index) const {
   CHECK_GE(index.id, 0);
@@ -674,9 +674,9 @@ InterpolatedIndex Path::GetIndexFromS(double s) const {
     return {num_points_ - 1, 0.0};
   }
   const int next_sample_id = sample_id + 1;
-  // ÏÂ½éµãMapPointµÄid
+  // ï¿½Â½ï¿½ï¿½MapPointï¿½ï¿½id
   int low = last_point_index_[sample_id];
-  // ÉÏ½éµãMapPointµÄid
+  // ï¿½Ï½ï¿½ï¿½MapPointï¿½ï¿½id
   int high = (next_sample_id < num_sample_points_
                   ? std::min(num_points_, last_point_index_[next_sample_id] + 1)
                   : num_points_);
@@ -688,7 +688,7 @@ InterpolatedIndex Path::GetIndexFromS(double s) const {
       high = mid;
     }
   }
-  // ·µ»ØÏÂ½éµãµÄid£¬ÒÔ¼°¾àÀëÏÂ½ÚµãµÄ¾àÀë
+  // ï¿½ï¿½ï¿½ï¿½ï¿½Â½ï¿½ï¿½ï¿½idï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â½Úµï¿½Ä¾ï¿½ï¿½ï¿½
   return {low, s - accumulated_s_[low]};
 }
 
@@ -840,6 +840,7 @@ bool Path::GetProjection(const Vec2d& point, double* accumulate_s,
   CHECK_GE(num_points_, 2);
   *min_distance = std::numeric_limits<double>::infinity();
   int min_index = 0;
+  // æ‰¾åˆ°è·ç¦»æœ€è¿‘çš„lineSegement2d
   for (int i = 0; i < num_segments_; ++i) {
     const double distance = segments_[i].DistanceSquareTo(point);
     if (distance < *min_distance) {
@@ -849,8 +850,8 @@ bool Path::GetProjection(const Vec2d& point, double* accumulate_s,
   }
   *min_distance = std::sqrt(*min_distance);
   const auto& nearest_seg = segments_[min_index];
-  const auto prod = nearest_seg.ProductOntoUnit(point);
-  const auto proj = nearest_seg.ProjectOntoUnit(point);
+  const auto prod = nearest_seg.ProductOntoUnit(point); // læ–¹å‘æŠ•å½±
+  const auto proj = nearest_seg.ProjectOntoUnit(point); // sæ–¹å‘æŠ•å½±
   if (min_index == 0) {
     *accumulate_s = std::min(proj, nearest_seg.length());
     if (proj < 0) {

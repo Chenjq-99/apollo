@@ -211,7 +211,13 @@ Status OnLanePlanning::InitFrame(const uint32_t sequence_num,
       return Status(ErrorCode::PLANNING_ERROR, msg);
     }
   }
-
+/*
+frame_->Init里为每个referenceLine扩充为referenceLineInfo类。referenceLine为原始的参考线信息，
+主要包含的还是偏向于地图层面的信息。referenceLineInfo里面包含了障碍物，车道宽度，路口信息，红绿灯信息，
+决策信息等和轨迹规划、速度规划各阶段业务相关联的信息，几乎所有的道路信息都会体现再参考线上，
+frame里包含一个vector<ReferenceLineInfo> reference_line_info_数组，
+数组中的每一个ReferenceLineInfo对象包含一个ReferenceLine对象和其他几乎所有的道路信息。(chenjq20231114)
+*/
   auto status = frame_->Init(
       injector_->vehicle_state(), reference_lines, segments,
       reference_line_provider_->FutureRouteWaypoints(), injector_->ego_info());

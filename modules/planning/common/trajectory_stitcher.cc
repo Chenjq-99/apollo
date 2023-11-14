@@ -225,7 +225,7 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
   ADEBUG << "Time matched index:\t" << time_matched_index;
 
   auto matched_index = std::min(time_matched_index, position_matched_index);
-    // 从match_point往前再保留20个点，截取轨迹
+    // 从match_point往前再保留20个点，截取轨迹[match_point -20, 当前时刻 + 100ms]
   std::vector<TrajectoryPoint> stitching_trajectory(
       prev_trajectory->begin() +
           std::max(0, static_cast<int>(matched_index - preserved_points_num)),
@@ -241,7 +241,7 @@ std::vector<TrajectoryPoint> TrajectoryStitcher::ComputeStitchingTrajectory(
                                               vehicle_state);
     }
     tp.set_relative_time(tp.relative_time() + prev_trajectory->header_time() -
-                         current_timestamp);
+                         current_timestamp); // 以current_timestamp为起点的相对时间
     tp.mutable_path_point()->set_s(tp.path_point().s() - zero_s); // 负的
   }
   return stitching_trajectory;

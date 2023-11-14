@@ -60,6 +60,7 @@ ReferenceLineInfo::ReferenceLineInfo(const common::VehicleState& vehicle_state,
 
 bool ReferenceLineInfo::Init(const std::vector<const Obstacle*>& obstacles) {
   const auto& param = VehicleConfigHelper::GetConfig().vehicle_param();
+  // 找到规划起点，也就是拼接点，创建包围盒
   // stitching point
   const auto& path_point = adc_planning_point_.path_point();
   Vec2d position(path_point.x(), path_point.y());
@@ -74,7 +75,7 @@ bool ReferenceLineInfo::Init(const std::vector<const Obstacle*>& obstacles) {
                        vec_to_center.rotate(vehicle_state_.heading()));
   Box2d vehicle_box(vehicle_center, vehicle_state_.heading(), param.length(),
                     param.width());
-
+  // 获得规划起始点的约束边界
   if (!reference_line_.GetSLBoundary(box, &adc_sl_boundary_)) {
     AERROR << "Failed to get ADC boundary from box: " << box.DebugString();
     return false;

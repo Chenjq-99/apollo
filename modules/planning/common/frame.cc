@@ -162,6 +162,7 @@ bool Frame::CreateReferenceLineInfo(
   reference_line_info_.clear();
   auto ref_line_iter = reference_lines.begin();
   auto segments_iter = segments.begin();
+  // 根据reference_lines构造reference_line_info_
   while (ref_line_iter != reference_lines.end()) {
     if (segments_iter->StopForDestination()) {
       is_near_destination_ = true;
@@ -190,6 +191,7 @@ bool Frame::CreateReferenceLineInfo(
   }
 
   bool has_valid_reference_line = false;
+  // 初始化reference_line_info，添加障碍物信息，设置巡航车速等
   for (auto &ref_info : reference_line_info_) {
     if (!ref_info.Init(obstacles())) {
       AERROR << "Failed to init reference line";

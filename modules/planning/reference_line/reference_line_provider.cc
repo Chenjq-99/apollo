@@ -891,8 +891,9 @@ void ReferenceLineProvider::GetAnchorPoints(
 
 bool ReferenceLineProvider::SmoothRouteSegment(const RouteSegments &segments,
                                                ReferenceLine *reference_line) {
-    // 构造一个path，用之前得到的通路初始化
+    // 用之前得到的通路构造一个path
   hdmap::Path path(segments);
+  // 用path构造一个参考线，并加以平滑
   return SmoothReferenceLine(ReferenceLine(path), reference_line);
 }
 
