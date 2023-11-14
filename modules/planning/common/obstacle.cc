@@ -333,6 +333,7 @@ void Obstacle::BuildReferenceLineStBoundary(const ReferenceLine& reference_line,
                              STPoint(end_s - adc_start_s, FLAGS_st_max_t));
     reference_line_st_boundary_ = STBoundary(point_pairs);
   } else {
+    // 构建障碍物未来的运动的ST边界
     if (BuildTrajectoryStBoundary(reference_line, adc_start_s,
                                   &reference_line_st_boundary_)) {
       ADEBUG << "Found st_boundary for obstacle " << id_;
@@ -376,15 +377,15 @@ bool Obstacle::BuildTrajectoryStBoundary(const ReferenceLine& reference_line,
 
   for (int i = 1; i < trajectory_points.size(); ++i) {
     ADEBUG << "last_sl_boundary: " << last_sl_boundary.ShortDebugString();
-
+    // Step 1. 首先还是对障碍物轨迹点两两选择，每两个点可以构建上图中的object_moving_box以及object_boundary。
     const auto& first_traj_point = trajectory_points[i - 1];
     const auto& second_traj_point = trajectory_points[i];
     const auto& first_point = first_traj_point.path_point();
     const auto& second_point = second_traj_point.path_point();
-
+    // object_moving_box总长度
     double object_moving_box_length =
         object_length + common::util::DistanceXY(first_point, second_point);
-
+    // object_moving_box中心
     common::math::Vec2d center((first_point.x() + second_point.x()) / 2.0,
                                (first_point.y() + second_point.y()) / 2.0);
     common::math::Box2d object_moving_box(
@@ -407,7 +408,7 @@ bool Obstacle::BuildTrajectoryStBoundary(const ReferenceLine& reference_line,
     const double end_s = (i == 1) ? reference_line.Length()
                                   : std::fmin(reference_line.Length(),
                                               mid_s + 2.0 * distance_xy);
-
+    // 计算object_boundary，由object_moving_box旋转一个heading得到，记录障碍物形式段的start_s, end_s, start_l和end_l
     if (!reference_line.GetApproximateSLBoundary(object_moving_box, start_s,
                                                  end_s, &object_boundary)) {
       AERROR << "failed to calculate boundary";
@@ -417,7 +418,7 @@ bool Obstacle::BuildTrajectoryStBoundary(const ReferenceLine& reference_line,
     // update history record
     last_sl_boundary = object_boundary;
     last_index = i;
-
+    // Step 2. 判断障碍物和车辆水平Lateral距离，如果障碍物在参考线两侧，那么障碍物可以忽略；如果障碍物在参考线后面，也可忽略
     // skip if object is entirely on one side of reference line.
     static constexpr double kSkipLDistanceFactor = 0.4;
     const double skip_l_distance =
@@ -447,13 +448,15 @@ bool Obstacle::BuildTrajectoryStBoundary(const ReferenceLine& reference_line,
     if (object_s_diff < st_boundary_delta_s) {
       continue;
     }
+    // Step 3. 计算low_t和high_t时刻的行驶上下界边界框
     const double delta_t =
-        second_traj_point.relative_time() - first_traj_point.relative_time();
+        second_traj_point.relative_time() - first_traj_point.relative_time(); // 0.1
     double low_s = std::max(object_boundary.start_s() - adc_half_length, 0.0);
     bool has_low = false;
     double high_s =
         std::min(object_boundary.end_s() + adc_half_length, FLAGS_st_max_s);
     bool has_high = false;
+    // 两侧逐渐逼近计算上下界
     while (low_s + st_boundary_delta_s < high_s && !(has_low && has_high)) {
       if (!has_low) {
         auto low_ref = reference_line.GetReferencePoint(low_s);
@@ -491,6 +494,7 @@ bool Obstacle::BuildTrajectoryStBoundary(const ReferenceLine& reference_line,
       }
     }
   }
+//   Step 4. 计算完所有障碍物轨迹段的上下界框以后，根据时间t进行排序
   if (!polygon_points.empty()) {
     std::sort(polygon_points.begin(), polygon_points.end(),
               [](const std::pair<STPoint, STPoint>& a,
@@ -738,7 +742,7 @@ void Obstacle::CheckLaneBlocking(const ReferenceLine& reference_line) {
   DCHECK(sl_boundary_.has_end_s());
   DCHECK(sl_boundary_.has_start_l());
   DCHECK(sl_boundary_.has_end_l());
-
+  // start_l 和 end_l分别在参考线两侧
   if (sl_boundary_.start_l() * sl_boundary_.end_l() < 0.0) {
     is_lane_blocking_ = true;
     return;
@@ -746,7 +750,7 @@ void Obstacle::CheckLaneBlocking(const ReferenceLine& reference_line) {
 
   const double driving_width = reference_line.GetDrivingWidth(sl_boundary_);
   auto vehicle_param = common::VehicleConfigHelper::GetConfig().vehicle_param();
-
+  // 虽然没骑在线上但是留出的空间不够主车通过
   if (reference_line.IsOnLane(sl_boundary_) &&
       driving_width <
           vehicle_param.width() + FLAGS_static_obstacle_nudge_l_buffer) {

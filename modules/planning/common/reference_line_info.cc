@@ -60,7 +60,7 @@ ReferenceLineInfo::ReferenceLineInfo(const common::VehicleState& vehicle_state,
 
 bool ReferenceLineInfo::Init(const std::vector<const Obstacle*>& obstacles) {
   const auto& param = VehicleConfigHelper::GetConfig().vehicle_param();
-  // 找到规划起点，也就是拼接点，创建包围盒
+  // 找到规划起点，也就是上一周期轨迹拼接点，创建包围盒
   // stitching point
   const auto& path_point = adc_planning_point_.path_point();
   Vec2d position(path_point.x(), path_point.y());
@@ -75,20 +75,21 @@ bool ReferenceLineInfo::Init(const std::vector<const Obstacle*>& obstacles) {
                        vec_to_center.rotate(vehicle_state_.heading()));
   Box2d vehicle_box(vehicle_center, vehicle_state_.heading(), param.length(),
                     param.width());
-  // 获得规划起始点的约束边界
+  // 获得包围盒在参考线上的投影
   if (!reference_line_.GetSLBoundary(box, &adc_sl_boundary_)) {
     AERROR << "Failed to get ADC boundary from box: " << box.DebugString();
     return false;
   }
 
   InitFirstOverlaps();
-
+  // 检查规划起点是否在参考线范围内
   if (adc_sl_boundary_.end_s() < 0 ||
       adc_sl_boundary_.start_s() > reference_line_.Length()) {
     AWARN << "Vehicle SL " << adc_sl_boundary_.ShortDebugString()
           << " is not on reference line:[0, " << reference_line_.Length()
           << "]";
   }
+  //  检查规划起点是否离参考线过远
   static constexpr double kOutOfReferenceLineL = 10.0;  // in meters
   if (adc_sl_boundary_.start_l() > kOutOfReferenceLineL ||
       adc_sl_boundary_.end_l() < -kOutOfReferenceLineL) {
@@ -96,6 +97,7 @@ bool ReferenceLineInfo::Init(const std::vector<const Obstacle*>& obstacles) {
     return false;
   }
   is_on_reference_line_ = reference_line_.IsOnLane(adc_sl_boundary_);
+  // 添加障碍物信息
   if (!AddObstacles(obstacles)) {
     AERROR << "Failed to add obstacles to reference line";
     return false;
@@ -108,7 +110,7 @@ bool ReferenceLineInfo::Init(const std::vector<const Obstacle*>& obstacles) {
                                   speed_bump.end_s + 1.0,
                                   FLAGS_speed_bump_speed_limit);
   }
-
+  // 设置巡航速度   
   SetCruiseSpeed(FLAGS_default_cruise_speed);
 
   // set lattice planning target speed limit;
@@ -361,27 +363,31 @@ Obstacle* ReferenceLineInfo::AddObstacle(const Obstacle* obstacle) {
     AERROR << "The provided obstacle is empty";
     return nullptr;
   }
+  // 加入到PathDecision
   auto* mutable_obstacle = path_decision_.AddObstacle(*obstacle);
   if (!mutable_obstacle) {
     AERROR << "failed to add obstacle " << obstacle->Id();
     return nullptr;
   }
-
+  // 计算障碍物框的start_s, end_s, start_l和end_l
   SLBoundary perception_sl;
   if (!reference_line_.GetSLBoundary(obstacle->PerceptionBoundingBox(),
                                      &perception_sl)) {
     AERROR << "Failed to get sl boundary for obstacle: " << obstacle->Id();
     return mutable_obstacle;
   }
+  // 计算障碍物是否对无人车行驶有影响：无光障碍物满足以下条件：
   mutable_obstacle->SetPerceptionSlBoundary(perception_sl);
+  //    1. 障碍物在ReferenceLine以外，忽略
   mutable_obstacle->CheckLaneBlocking(reference_line_);
   if (mutable_obstacle->IsLaneBlocking()) {
     ADEBUG << "obstacle [" << obstacle->Id() << "] is lane blocking.";
   } else {
     ADEBUG << "obstacle [" << obstacle->Id() << "] is NOT lane blocking.";
   }
-
+  //    2. 车辆和障碍物都在车道上，但是障碍物在无人车后面，忽略
   if (IsIrrelevantObstacle(*mutable_obstacle)) {
+    // 打上ignore标签
     ObjectDecisionType ignore;
     ignore.mutable_ignore();
     path_decision_.AddLateralDecision("reference_line_filter", obstacle->Id(),
@@ -390,6 +396,7 @@ Obstacle* ReferenceLineInfo::AddObstacle(const Obstacle* obstacle) {
                                            obstacle->Id(), ignore);
     ADEBUG << "NO build reference line st boundary. id:" << obstacle->Id();
   } else {
+    // 确定某个时间点无人车能前进到的位置
     ADEBUG << "build reference line st boundary. id:" << obstacle->Id();
     mutable_obstacle->BuildReferenceLineStBoundary(reference_line_,
                                                    adc_sl_boundary_.start_s());

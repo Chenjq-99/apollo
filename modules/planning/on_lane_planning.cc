@@ -349,6 +349,11 @@ void OnLanePlanning::RunOnce(const LocalView& local_view,
 
   injector_->ego_info()->Update(stitching_trajectory.back(), vehicle_state);
   const uint32_t frame_num = static_cast<uint32_t>(seq_num_++);
+  /*
+  InitFrame里调用了GetReferenceLines和frame_->Init，其中GetReferenceLines是获取参考线，整个规划都是基于Reference Line开始的，
+  可以说是通  过Reference Line来把整个业务流程组织起来，前期输入的很多信息以及各个流程处理后的信息都会存储在Reference Line中，
+  Reference Line上承Rounting模块，又下启决策，轨迹规划和速度规划。
+  */
   status = InitFrame(frame_num, stitching_trajectory.back(), vehicle_state);
 
   if (status.ok()) {
@@ -392,6 +397,7 @@ void OnLanePlanning::RunOnce(const LocalView& local_view,
   }
 
   for (auto& ref_line_info : *frame_->mutable_reference_line_info()) {
+    // 为每个ref_line_info进行交规决策
     TrafficDecider traffic_decider;
     traffic_decider.Init(traffic_rule_configs_);
     auto traffic_status =
@@ -402,7 +408,7 @@ void OnLanePlanning::RunOnce(const LocalView& local_view,
             << " traffic decider failed";
     }
   }
-
+  // 开始规划
   status = Plan(start_timestamp, stitching_trajectory, ptr_trajectory_pb);
 
   for (const auto& p : ptr_trajectory_pb->trajectory_point()) {
@@ -536,7 +542,7 @@ void OnLanePlanning::ExportReferenceLineDebug(planning_internal::Debug* debug) {
     rl_debug->set_average_offset(average_offset / sample_count);
   }
 }
-
+// 一切准备就绪，开始规划
 Status OnLanePlanning::Plan(
     const double current_time_stamp,
     const std::vector<TrajectoryPoint>& stitching_trajectory,
@@ -548,7 +554,7 @@ Status OnLanePlanning::Plan(
     frame_->mutable_open_space_info()->set_debug(ptr_debug);
     frame_->mutable_open_space_info()->sync_debug_instance();
   }
-
+  // 使用public_road planner进行规划
   auto status = planner_->Plan(stitching_trajectory.back(), frame_.get(),
                                ptr_trajectory_pb);
 

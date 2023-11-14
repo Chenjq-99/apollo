@@ -20,7 +20,7 @@ source "${CURR_DIR}/docker_base.sh"
 
 CACHE_ROOT_DIR="${APOLLO_ROOT_DIR}/.cache"
 
-DOCKER_REPO="apolloauto/apollo"
+DOCKER_REPO="registry.baidubce.com/apolloauto/apollo"
 DEV_CONTAINER="apollo_dev_${USER}"
 DEV_INSIDE="in-dev-docker"
 
