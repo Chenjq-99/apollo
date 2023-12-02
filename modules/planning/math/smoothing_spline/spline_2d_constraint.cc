@@ -69,7 +69,7 @@ bool Spline2dConstraint::Add2dBoundary(
       ref_point.size() != lateral_bound.size() ||
       lateral_bound.size() != longitudinal_bound.size()) {
     return false;
-  }
+  } 
   Eigen::MatrixXd affine_inequality =
       Eigen::MatrixXd::Zero(4 * t_coord.size(), total_param_);
   Eigen::MatrixXd affine_boundary =
@@ -78,9 +78,13 @@ bool Spline2dConstraint::Add2dBoundary(
     const double d_lateral = SignDistance(ref_point[i], angle[i]);
     const double d_longitudinal =
         SignDistance(ref_point[i], angle[i] - M_PI / 2.0);
+    // 计算anchor point所属的段
     const uint32_t index = FindIndex(t_coord[i]);
+    // rel_t是anchor point累积距离s相对于下界knots累积距离s的相对差
     const double rel_t = t_coord[i] - t_knots_[index];
+    // 第i个拟合函数的参数偏移位置为2*(spline_order+1)*i
     const uint32_t index_offset = 2 * index * (spline_order_ + 1);
+    // 拟合点的投影系数
     std::vector<double> longi_coef = AffineCoef(angle[i], rel_t);
     std::vector<double> longitudinal_coef =
         AffineCoef(angle[i] - M_PI / 2, rel_t);

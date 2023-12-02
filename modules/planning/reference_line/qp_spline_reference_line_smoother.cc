@@ -128,6 +128,7 @@ bool QpSplineReferenceLineSmoother::Sampling() {
   uint32_t num_spline =
       std::max(1u, static_cast<uint32_t>(
                        length / config_.qp_spline().max_spline_length() + 0.5));
+  // 采样Knot，25m
   for (std::uint32_t i = 0; i <= num_spline; ++i) {
     t_knots_.push_back(i * 1.0);
   }
@@ -159,14 +160,14 @@ bool QpSplineReferenceLineSmoother::AddConstraint() {
   }
 
   auto* spline_constraint = spline_solver_->mutable_constraint();
-
+  // 拟合的x'和y'需要保证在真实x和y的L轴lateral_bound、F轴longitudinal_bound领域内
   // all points (x, y) should not deviate anchor points by a bounding box
   if (!spline_constraint->Add2dBoundary(evaluated_t, headings, xy_points,
                                         longitudinal_bound, lateral_bound)) {
     AERROR << "Add 2d boundary constraint failed.";
     return false;
   }
-
+  // 第一个anchor point的heading和函数的一阶导方向需要一致，大小可以不一致，但是方向必需一致
   // the heading of the first point should be identical to the anchor point.
 
   if (FLAGS_enable_reference_line_stitching &&
@@ -175,7 +176,7 @@ bool QpSplineReferenceLineSmoother::AddConstraint() {
     AERROR << "Add 2d point angle constraint failed.";
     return false;
   }
-
+  // x和y的n段函数之间，两两接壤部分应该是平滑的，两个函数值(位置)、一阶导(速度)、二阶导(加速度)必须一致
   // all spline should be connected smoothly to the second order derivative.
   if (!spline_constraint->AddSecondDerivativeSmoothConstraint()) {
     AERROR << "Add jointness constraint failed.";
